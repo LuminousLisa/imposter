@@ -1,0 +1,70 @@
+const nodemailer = require('nodemailer');
+const fs = require('fs');
+const csvParser = require('csv-parser');
+const path = require('path');
+
+// Load the HTML template
+const emailTemplate = fs.readFileSync('ArcadeRenewalRemider.html', 'utf8');
+
+// Path to the CSV file
+const csvFilePath = path.join(__dirname, 'contacts', 'dec1failedrenewal.csv');
+
+// Configure nodemailer transporter
+const transporter = nodemailer.createTransport({
+    host: 'smtp.apple.com', // Replace with SMTP server
+    port: 587, // Port for secure SMTP
+    secure: false, // true for port 465, false for other ports
+    auth: {
+        user: 'renewalsl@apple.com',  
+        pass: 'some_password' 
+    }
+});
+
+// Parse the CSV file and send emails
+const parseAndSendEmails = async () => {
+    const recipients = [];
+
+    // Read and parse the CSV file
+    fs.createReadStream(csvFilePath)
+        .pipe(csvParser())
+        .on('data', (row) => {
+            recipients.push({ email: row.email, name: row.name }); // Adjust column names based on your CSV structure
+        })
+        .on('end', async () => {
+            console.log(`Parsed ${recipients.length} contacts.`);
+
+            // Send emails
+            for (const recipient of recipients) {
+                await sendEmail(recipient);
+            }
+
+            console.log('All emails sent successfully!');
+        })
+        .on('error', (error) => {
+            console.error('Error reading CSV file:', error.message);
+        });
+};
+
+// Function to send email
+const sendEmail = async (recipient) => {
+    // Replace placeholder with recipient's name
+    const personalizedHtml = emailTemplate.replace(/\*|FNAME\|/g, recipient.name);
+
+    // Email options
+    const mailOptions = {
+        from: '"Your Name" <renewals@apple.com.com>', // Sender's email address
+        to: recipient.email, // Recipient's email address
+        subject: 'We Missed You!', // Subject line
+        html: fname // Personalized HTML content
+    };
+
+    try {
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`Email sent to ${recipient.email}:`, info.response);
+    } catch (error) {
+        console.error(`Error sending email to ${recipient.email}:`, error.message);
+    }
+};
+
+// Start the process
+parseAndSendEmails();
